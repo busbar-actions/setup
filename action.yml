@@ -1,0 +1,67 @@
+name: 'Busbar — setup binary'
+description: 'Download a prebuilt busbar action binary from the release host and add it to PATH. The single install path shared by every busbar action.'
+author: 'busbar.agency'
+branding:
+  icon: 'download'
+  color: 'blue'
+
+inputs:
+  binary:
+    description: 'Binary name to install (e.g. sf-pii-scan, sf-schema-dump).'
+    required: true
+  version:
+    description: 'Release tag to download (e.g. v0.1.0). "latest" resolves the most recent release.'
+    required: false
+    default: 'latest'
+  binary-repo:
+    description: 'GitHub repo that publishes the binary releases.'
+    required: false
+    default: 'busbar-actions/actions-dist'
+
+outputs:
+  bin-path:
+    description: 'Absolute path to the installed binary.'
+    value: ${{ steps.install.outputs.bin-path }}
+  tag:
+    description: 'The resolved release tag the binary was downloaded from.'
+    value: ${{ steps.install.outputs.tag }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install ${{ inputs.binary }}
+      id: install
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -euo pipefail
+        # GitHub-hosted runners are linux/amd64 — the only target published to
+        # actions-dist. Fail loudly anywhere else rather than 404 on download.
+        case "${RUNNER_OS}-${RUNNER_ARCH}" in
+          Linux-X64) triple="x86_64-unknown-linux-gnu" ;;
+          *) echo "::error::busbar binaries are published for Linux x86_64 only (runner is ${RUNNER_OS}-${RUNNER_ARCH})."; exit 1 ;;
+        esac
+
+        asset="${{ inputs.binary }}-${triple}"
+        if [[ "${{ inputs.version }}" == "latest" ]]; then
+          tag="$(gh release view --repo "${{ inputs.binary-repo }}" --json tagName -q .tagName)"
+        else
+          tag="${{ inputs.version }}"
+        fi
+
+        bin_dir="${RUNNER_TEMP}/busbar-bin"
+        mkdir -p "$bin_dir"
+        gh release download "$tag" \
+          --repo "${{ inputs.binary-repo }}" \
+          --pattern "$asset" \
+          --dir "$bin_dir"
+
+        bin_path="$bin_dir/${{ inputs.binary }}"
+        mv "$bin_dir/$asset" "$bin_path"
+        chmod +x "$bin_path"
+
+        echo "$bin_dir" >> "$GITHUB_PATH"
+        echo "bin-path=$bin_path" >> "$GITHUB_OUTPUT"
+        echo "tag=$tag" >> "$GITHUB_OUTPUT"
+        echo "Installed ${{ inputs.binary }} ($tag) from ${{ inputs.binary-repo }} → $bin_path"
