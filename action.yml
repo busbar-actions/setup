@@ -66,7 +66,11 @@ runs:
         mv "$bin_dir/$asset" "$bin_path"
         chmod +x "$bin_path"
 
+        # GITHUB_PATH takes effect in SUBSEQUENT steps only — it does NOT update
+        # the PATH of the step that writes it. Export it inline as well so the
+        # self-check below (same step) is valid; future steps get it via GITHUB_PATH.
         echo "$bin_dir" >> "$GITHUB_PATH"
+        export PATH="$bin_dir:$PATH"
         echo "bin-path=$bin_path" >> "$GITHUB_OUTPUT"
         echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
