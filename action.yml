@@ -29,13 +29,15 @@ outputs:
 runs:
   using: 'composite'
   steps:
-    - name: Install ${{ inputs.binary }}
+    - name: Download the ${{ inputs.binary }} Linux-x86_64 binary from ${{ inputs.binary-repo }} and add it to PATH
       id: install
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
         set -euo pipefail
+        echo "▶ TESTING: install the '${{ inputs.binary }}' binary (version='${{ inputs.version }}') from release host '${{ inputs.binary-repo }}'"
+
         # GitHub-hosted runners are linux/amd64 — the only target published to
         # actions-dist. Fail loudly anywhere else rather than 404 on download.
         case "${RUNNER_OS}-${RUNNER_ARCH}" in
@@ -49,9 +51,12 @@ runs:
         else
           tag="${{ inputs.version }}"
         fi
+        echo "  resolved release tag: ${tag}; downloading asset: ${asset}"
 
         bin_dir="${RUNNER_TEMP}/busbar-bin"
         mkdir -p "$bin_dir"
+        # Under `set -euo pipefail` a failed `gh release download` (missing tag,
+        # missing asset, auth/network failure) aborts the step — never swallowed.
         gh release download "$tag" \
           --repo "${{ inputs.binary-repo }}" \
           --pattern "$asset" \
@@ -64,4 +69,9 @@ runs:
         echo "$bin_dir" >> "$GITHUB_PATH"
         echo "bin-path=$bin_path" >> "$GITHUB_OUTPUT"
         echo "tag=$tag" >> "$GITHUB_OUTPUT"
-        echo "Installed ${{ inputs.binary }} ($tag) from ${{ inputs.binary-repo }} → $bin_path"
+
+        echo "✓ RESULT: installed '${{ inputs.binary }}' (${tag}) from '${{ inputs.binary-repo }}' -> ${bin_path}"
+        echo "  evidence — installed binary on disk:"
+        ls -la "$bin_path"
+        echo "  evidence — '${{ inputs.binary }}' is now resolvable on PATH:"
+        command -v "${{ inputs.binary }}" || { echo "::error::'${{ inputs.binary }}' is not on PATH after install"; exit 1; }
