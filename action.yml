@@ -29,14 +29,14 @@ outputs:
 runs:
   using: 'composite'
   steps:
-    - name: Download the ${{ inputs.binary }} Linux-x86_64 binary from ${{ inputs.binary-repo }} and add it to PATH
+    - name: Install ${{ inputs.binary }}
       id: install
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
         set -euo pipefail
-        echo "▶ TESTING: install the '${{ inputs.binary }}' binary (version='${{ inputs.version }}') from release host '${{ inputs.binary-repo }}'"
+        echo "Installing ${{ inputs.binary }} ${{ inputs.version }} from ${{ inputs.binary-repo }}"
 
         # GitHub-hosted runners are linux/amd64 — the only target published to
         # actions-dist. Fail loudly anywhere else rather than 404 on download.
@@ -74,8 +74,6 @@ runs:
         echo "bin-path=$bin_path" >> "$GITHUB_OUTPUT"
         echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
-        echo "✓ RESULT: installed '${{ inputs.binary }}' (${tag}) from '${{ inputs.binary-repo }}' -> ${bin_path}"
-        echo "  evidence — installed binary on disk:"
-        ls -la "$bin_path"
+        echo "Installed ${{ inputs.binary }} ${tag} → ${bin_path}"
         echo "  evidence — '${{ inputs.binary }}' is now resolvable on PATH:"
         command -v "${{ inputs.binary }}" || { echo "::error::'${{ inputs.binary }}' is not on PATH after install"; exit 1; }
